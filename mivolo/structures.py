@@ -359,15 +359,16 @@ class PersonAndFaceResult:
 
         names = self.yolo_results.names
         pred_boxes = self.yolo_results.boxes
-        for _, (det, age, gender, _) in enumerate(zip(pred_boxes, self.ages, self.genders, self.gender_scores)):
+        for _, (det, age, gender, gender_score) in \
+                enumerate(zip(pred_boxes, self.ages, self.genders, self.gender_scores)):
             if det.id is None:
                 continue
             cat_id, _, guid = int(det.cls), float(det.conf), int(det.id.item())
             name = names[cat_id]
             if name == "person":
-                persons[guid] = (age, gender)
+                persons[guid] = (age, gender, gender_score, det.xyxy, det.conf)
             elif name == "face":
-                faces[guid] = (age, gender)
+                faces[guid] = (age, gender, gender_score, det.xyxy, det.conf)
 
         return persons, faces
 

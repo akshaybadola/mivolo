@@ -8,6 +8,8 @@ from mivolo.model.mi_volo import MiVOLO
 from mivolo.model.yolo_detector import Detector
 from mivolo.structures import AGE_GENDER_TYPE, PersonAndFaceResult
 
+from common_pyutil.monitor import Timer
+timer = Timer()
 
 class Predictor:
     def __init__(self, config, verbose: bool = False):
@@ -41,28 +43,42 @@ class Predictor:
         detected_objects_history: Dict[int, List[AGE_GENDER_TYPE]] = defaultdict(list)
 
         total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        for _ in tqdm.tqdm(range(total_frames)):
+        for frame_num in tqdm.tqdm(range(total_frames)):
             ret, frame = video_capture.read()
             if not ret:
                 break
 
-            detected_objects: PersonAndFaceResult = self.detector.track(frame)
-            self.age_gender_model.predict(frame, detected_objects)
+            with timer:
+                detected_objects: PersonAndFaceResult = self.detector.track(frame)
+                # details = []
+                # for i in range(len(detected_objects.yolo_results)):
+                #     details.append({"bbox": detected_objects.yolo_results.boxes.xyxy[i],
+                #                     "confidence": detected_objects.yolo_results.boxes.conf[i],
+                #                     "age": detected_objects.ages[i],
+                #                     "gender": detected_objects.genders[i]})
+            # print(f"Time for person detection: {timer.time}")
+            with timer:
+                self.age_gender_model.predict(frame, detected_objects)
+            # print(f"Time for gender prediction: {timer.time}")
 
-            current_frame_objs = detected_objects.get_results_for_tracking()
-            cur_persons: Dict[int, AGE_GENDER_TYPE] = current_frame_objs[0]
-            cur_faces: Dict[int, AGE_GENDER_TYPE] = current_frame_objs[1]
+            with timer:
+                current_frame_objs = detected_objects.get_results_for_tracking()
+                cur_persons: Dict[int, AGE_GENDER_TYPE] = current_frame_objs[0]
+                cur_faces: Dict[int, AGE_GENDER_TYPE] = current_frame_objs[1]
+            # print(f"Time for post process: {timer.time}")
 
             # add tr_persons and tr_faces to history
             for guid, data in cur_persons.items():
                 # not useful for tracking :)
                 if None not in data:
-                    detected_objects_history[guid].append(data)
+                    detected_objects_history[guid].append([frame_num, *data])
             for guid, data in cur_faces.items():
                 if None not in data:
-                    detected_objects_history[guid].append(data)
+                    detected_objects_history[guid].append([frame_num, *data])
 
-            detected_objects.set_tracked_age_gender(detected_objects_history)
-            if self.draw:
-                frame = detected_objects.plot()
+            with timer:
+                detected_objects.set_tracked_age_gender(detected_objects_history)
+                if self.draw:
+                    frame = detected_objects.plot()
+            # print(f"Time for drawing: {timer.time}")
             yield detected_objects_history, frame
