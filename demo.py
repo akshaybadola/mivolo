@@ -108,7 +108,7 @@ def do_demo(args):
                 out.write(frame)
             j += 1
             if j > args.num_frames:
-                print(f"Stopping after {num_frames} frames")
+                print(f"Stopping after {args.num_frames} frames")
                 break
         if args.dump_history:
             history = {}
